@@ -6,7 +6,9 @@
 set -euo pipefail
 
 VIMAX_HOME="${VIMAX_HOME:-$HOME/tools/ViMax}"
-PIN_FILE="${TOOLBOX_HOME:-$HOME/tools/claude-toolbox}/tools/vimax/PIN"
+# PIN lives next to this script's recipe when symlinked; copies (Git Bash) fall back to TOOLBOX_HOME.
+SELF_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")" && pwd)"
+if [[ -f "$SELF_DIR/../tool.sh" ]]; then PIN_FILE="$SELF_DIR/../PIN"; else PIN_FILE="${TOOLBOX_HOME:-$HOME/tools/claude-toolbox}/tools/vimax/PIN"; fi
 CONFIG="$VIMAX_HOME/configs/agent.local.yaml"
 
 usage() {

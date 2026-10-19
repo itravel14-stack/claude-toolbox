@@ -34,6 +34,16 @@ for every session regardless of which repo is open: claude.ai/code → environme
 Edit → Setup script → paste `setup-script.sh`. Put tool API keys in the same
 environment's environment variables (e.g. `VIMAX_LLM_API_KEY`), never in a repo.
 
+## Move everything on the PC to GitHub (so cloud sessions can reach it)
+
+```bash
+bash ~/tools/claude-toolbox/pc/sync-to-github.sh            # scans C:/Dev/* and Desktop/*
+bash ~/tools/claude-toolbox/pc/sync-to-github.sh "C:/path/a" "C:/path/b"   # or specific folders
+```
+Pushes every branch, and snapshots uncommitted work to a `cloud-sync/<branch>` branch
+without touching your local files. Skips snapshots containing `.env`/key/secret files.
+Prints folders that aren't on GitHub yet — give Claude that list to create the repos.
+
 ## Add a tool
 
 ```bash

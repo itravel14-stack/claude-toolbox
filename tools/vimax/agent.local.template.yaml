@@ -1,0 +1,38 @@
+# ViMax private config. Lives at <ViMax>/configs/agent.local.yaml (git-ignored upstream).
+# Never commit this file once it holds keys. Env vars override every field:
+#   VIMAX_LLM_API_KEY / VIMAX_IMAGE_API_KEY / VIMAX_VIDEO_API_KEY (+ _MODEL, _BASE_URL)
+#
+# Default below: one OpenRouter key covers all three stages.
+# Agent-mode video routing only supports openrouter.ai or yunwu.ai base URLs.
+
+llm:
+  model_provider: openai          # OpenAI-compatible client, not "OpenAI the company"
+  model: google/gemini-2.5-flash  # must support vision when num_candidates > 1
+  base_url: https://openrouter.ai/api/v1
+  api_key: ''
+
+image:
+  model: openai/gpt-image-2
+  base_url: https://openrouter.ai/api/v1
+  api_key: ''                     # empty = reuse llm key
+
+# 1 = one keyframe per shot (cheapest). 2 = upstream default, ~2x image cost.
+image_selection:
+  num_candidates: 1
+
+video:
+  model: google/veo-3.1-lite      # or bytedance/seedance-2.0-fast
+  base_url: https://openrouter.ai/api/v1
+  api_key: ''                     # empty = reuse llm key
+
+# Only needed for novel2video planning.
+embedding:
+  model_provider: openai
+  model: text-embedding-3-small
+  base_url: ''
+  api_key: ''
+
+reranker:
+  model: BAAI/bge-reranker-v2-m3
+  base_url: ''
+  api_key: ''

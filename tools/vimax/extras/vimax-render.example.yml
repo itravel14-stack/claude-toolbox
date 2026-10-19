@@ -1,0 +1,51 @@
+# Optional: render a ViMax video on a GitHub-hosted runner.
+# Copy to <repo>/.github/workflows/vimax-render.yml only in a repo that wants it.
+# Requires repo secret OPENROUTER_API_KEY. Runs only on manual dispatch (paid APIs).
+name: vimax-render
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: "Brief for the ViMax agent (include: render the video now)"
+        required: true
+      output_name:
+        description: "Artifact file name (no extension)"
+        default: "vimax-render"
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      VIMAX_LLM_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      VIMAX_LLM_BASE_URL: https://openrouter.ai/api/v1
+      VIMAX_LLM_MODEL: google/gemini-2.5-flash
+      VIMAX_IMAGE_BASE_URL: https://openrouter.ai/api/v1
+      VIMAX_IMAGE_MODEL: openai/gpt-image-2
+      VIMAX_VIDEO_BASE_URL: https://openrouter.ai/api/v1
+      VIMAX_VIDEO_MODEL: google/veo-3.1-lite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Fetch pinned ViMax
+        run: |
+          git clone https://github.com/HKUDS/ViMax.git "$RUNNER_TEMP/ViMax"
+          git -C "$RUNNER_TEMP/ViMax" checkout fd4b72e7731be6e5f88486206d25ea59849b0285
+          cd "$RUNNER_TEMP/ViMax" && uv sync
+      - name: Render
+        working-directory: ${{ runner.temp }}/ViMax
+        env:
+          PROMPT: ${{ inputs.prompt }}   # via env, never inline: avoids shell injection
+        run: uv run python main_agent.py --new-session --new-session-name ci --once "$PROMPT"
+      - name: Collect output
+        env:
+          NAME: ${{ inputs.output_name }}
+        run: |
+          mkdir -p out
+          find "$RUNNER_TEMP/ViMax/.working_dir" -name final_video.mp4 -exec cp {} "out/$NAME.mp4" \; -quit
+          test -f "out/$NAME.mp4"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.output_name }}
+          path: out/

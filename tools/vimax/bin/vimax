@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# vimax — shared wrapper around the official HKUDS/ViMax install.
+# Works from any directory: every ViMax call runs from VIMAX_HOME, because
+# ViMax reads configs/agent.local.yaml, .vimax/ and .working_dir/ relative to cwd.
+# Official commands (tui, web) are passed straight to ViMax's own ./vimax script.
+set -euo pipefail
+
+VIMAX_HOME="${VIMAX_HOME:-$HOME/tools/ViMax}"
+PIN_FILE="${TOOLBOX_HOME:-$HOME/tools/claude-toolbox}/tools/vimax/PIN"
+CONFIG="$VIMAX_HOME/configs/agent.local.yaml"
+
+usage() {
+  cat <<EOF
+vimax — shared ViMax wrapper (engine: $VIMAX_HOME)
+
+  vimax doctor                       Check install, deps, config, keys (values never printed)
+  vimax path                         Print the ViMax install path
+  vimax tui [new|resume [id]]        Official ViMax terminal UI
+  vimax web [start]                  Official ViMax Web UI (http://127.0.0.1:4173)
+  vimax agent --yes "<prompt>"       One headless Agent Loop turn (may call paid APIs)
+        [--new "<name>"|--session <id>] [--jsonl]
+  vimax status [id]                  List sessions, or show one session's artifact checklist
+  vimax export <id> <dest_dir> [name] Copy a session's final_video.mp4 into a project (no overwrite)
+  vimax test                         Run ViMax's offline test suite (no API calls)
+  vimax update-check                 Fetch upstream and show new commits (never applies them)
+  vimax pin                          Record the current commit as known-good
+  vimax rollback                     Check out the recorded known-good commit
+EOF
+}
+
+die() { echo "error: $*" >&2; exit 2; }
+need_home() { [[ -d "$VIMAX_HOME/.git" ]] || die "ViMax not found at $VIMAX_HOME (set VIMAX_HOME or run claude-toolbox/bootstrap.sh vimax)"; }
+in_home() { cd "$VIMAX_HOME"; }
+py() { in_home; uv run --no-sync python "$@"; }
+
+# Reports whether a key resolves (env > agent.local.yaml > llm fallback) without revealing it.
+key_state() {
+  py -c "from agent_runtime.config import *; print('set' if $1() else 'MISSING')"
+}
+
+cmd_doctor() {
+  need_home; in_home
+  local ok=1
+  check() { if eval "$2" >/dev/null 2>&1; then echo "PASS  $1"; else echo "FAIL  $1"; ok=0; fi; }
+  echo "ViMax: $VIMAX_HOME"
+  echo "commit: $(git rev-parse --short HEAD) ($(git describe --tags 2>/dev/null || echo untagged))"
+  [[ -f "$PIN_FILE" ]] && echo "known-good: $(cut -c1-7 "$PIN_FILE")"
+  check "remote is HKUDS/ViMax" "git remote get-url origin | grep -qi 'HKUDS/ViMax'"
+  check "working tree clean (tracked files)" "git diff --quiet HEAD"
+  check "uv installed" "command -v uv"
+  check "python env resolves" "uv run --no-sync python -c 'import pipelines.idea2video_pipeline, agent_runtime'"
+  check "node >= 18" "node -e 'process.exit(+process.versions.node.split(\".\")[0] >= 18 ? 0 : 1)'"
+  check "ffmpeg on PATH" "command -v ffmpeg"
+  check "TUI deps (ui/node_modules)" "test -x ui/node_modules/.bin/tsx"
+  check "Web deps (web/node_modules)" "test -x web/node_modules/.bin/vite"
+  check "configs/agent.local.yaml exists" "test -f '$CONFIG'"
+  check "agent.local.yaml is git-ignored" "git check-ignore -q configs/agent.local.yaml"
+  if [[ -f "$CONFIG" || -n "${VIMAX_LLM_API_KEY:-}${VIMAX_API_KEY:-}" ]]; then
+    echo "llm   key: $(key_state llm_api_key)   base_url: $(py -c 'from agent_runtime.config import *; print(llm_base_url())')"
+    echo "image key: $(key_state image_api_key)   model: $(py -c 'from agent_runtime.config import *; print(image_model())')"
+    echo "video key: $(key_state video_api_key)   model: $(py -c 'from agent_runtime.config import *; print(video_model())')   provider: $(py -c 'from agent_runtime.config import *; print(video_provider() or "UNSUPPORTED base_url")')"
+  fi
+  [[ $ok == 1 ]] && echo "doctor: OK" || { echo "doctor: issues found"; return 1; }
+}
+
+cmd_agent() {
+  need_home
+  local yes=0 args=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --yes|-y) yes=1; shift ;;
+      --new) args+=(--new-session --new-session-name "${2:?--new needs a name}"); shift 2 ;;
+      --session) args+=(--session "${2:?--session needs an id}"); shift 2 ;;
+      --jsonl) args+=(--jsonl); shift ;;
+      *) break ;;
+    esac
+  done
+  [[ $# -ge 1 ]] || die 'usage: vimax agent --yes [--new name|--session id] "<prompt>"'
+  [[ $yes == 1 ]] || die "agent turns call paid LLM/image/video APIs. Re-run with --yes once the cost is approved."
+  in_home
+  exec uv run --no-sync python main_agent.py "${args[@]}" --once "$*"
+}
+
+cmd_status() {
+  need_home
+  py - "${1:-}" <<'PY'
+import sys, json
+from agent_runtime.session_index import SessionIndex
+idx = SessionIndex(".")
+sid = sys.argv[1]
+if sid:
+    rec = idx.get(sid) or sys.exit(f"unknown session: {sid}")
+    print(json.dumps({k: rec.get(k) for k in ("session_id", "project_name", "stage", "working_dir")}, indent=2))
+    for name, present in idx.artifact_checklist(sid).items():
+        print(("x " if present else "- ") + name)
+else:
+    data = idx.load()
+    active = data.get("active_session_id")
+    for s in data.get("sessions", {}).values():
+        mark = "*" if s.get("session_id") == active else " "
+        print(f"{mark} {s.get('session_id'):40} {s.get('stage',''):14} {s.get('project_name','')}")
+    if not data.get("sessions"):
+        print("no sessions yet")
+PY
+}
+
+cmd_export() {
+  need_home
+  local sid="${1:?usage: vimax export <session_id> <dest_dir> [name]}" dest="${2:?dest_dir required}" name="${3:-}"
+  local wd
+  wd="$(py -c 'import sys; from agent_runtime.session_index import SessionIndex as S; i = S("."); i.get(sys.argv[1]) or sys.exit("unknown session: " + sys.argv[1]); print(i.working_dir(sys.argv[1]))' "$sid")" || exit 2
+  local src=""
+  for f in "$wd/script2video/final_video.mp4" "$wd/idea2video/final_video.mp4"; do [[ -f "$f" ]] && { src="$f"; break; }; done
+  [[ -n "$src" ]] || die "no final_video.mp4 in $wd — the render has not finished"
+  mkdir -p "$dest"
+  local out="$dest/${name:-vimax-$sid-$(date +%Y%m%d-%H%M%S)}"; [[ "$out" == *.mp4 ]] || out="$out.mp4"
+  [[ -e "$out" ]] && die "$out already exists — choose another name"
+  cp "$src" "$out"
+  echo "exported: $out ($(du -h "$out" | cut -f1))"
+  command -v ffprobe >/dev/null && ffprobe -v error -show_entries format=duration:stream=codec_name,width,height -of compact "$out" || true
+}
+
+cmd_update_check() {
+  need_home; in_home
+  git fetch --quiet origin
+  local n; n="$(git rev-list --count HEAD..origin/HEAD 2>/dev/null || git rev-list --count HEAD..origin/main)"
+  echo "local:    $(git rev-parse --short HEAD)"
+  echo "upstream: $(git rev-parse --short origin/HEAD 2>/dev/null || git rev-parse --short origin/main)  ($n new commits)"
+  [[ "$n" == 0 ]] || git log --oneline HEAD..origin/HEAD 2>/dev/null || git log --oneline HEAD..origin/main
+  echo "To upgrade: vimax pin; cd $VIMAX_HOME && git merge --ff-only origin/main && uv sync && (cd ui && npm install) && (cd web && npm install) && vimax test"
+}
+
+command="${1:-help}"; shift || true
+case "$command" in
+  doctor) cmd_doctor ;;
+  path) echo "$VIMAX_HOME" ;;
+  tui|web) need_home; in_home; exec ./vimax "$command" "$@" ;;
+  agent) cmd_agent "$@" ;;
+  status) cmd_status "$@" ;;
+  export) cmd_export "$@" ;;
+  test) need_home; in_home; exec uv run --group dev pytest -q ;;
+  update-check) cmd_update_check ;;
+  pin) need_home; git -C "$VIMAX_HOME" rev-parse HEAD > "$PIN_FILE"; echo "pinned $(cut -c1-7 "$PIN_FILE") in $PIN_FILE (commit the toolbox to share it)" ;;
+  rollback) need_home; [[ -f "$PIN_FILE" ]] || die "no PIN recorded"; git -C "$VIMAX_HOME" checkout --quiet "$(cat "$PIN_FILE")"; (in_home; uv sync); echo "rolled back to $(cut -c1-7 "$PIN_FILE") (detached HEAD; 'git checkout main' to return)" ;;
+  help|-h|--help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac

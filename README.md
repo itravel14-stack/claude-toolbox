@@ -34,6 +34,10 @@ for every session regardless of which repo is open: claude.ai/code → environme
 Edit → Setup script → paste `setup-script.sh`. Put tool API keys in the same
 environment's environment variables (e.g. `VIMAX_LLM_API_KEY`), never in a repo.
 
+New sessions start from a cached snapshot and skip the script until its text changes
+(or ~7 days pass). After adding or updating a tool, bump `toolbox-rev` in `setup-script.sh`
+and re-paste it, or new sessions keep the old toolbox.
+
 ## Move everything on the PC to GitHub (so cloud sessions can reach it)
 
 ```bash

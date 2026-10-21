@@ -68,3 +68,4 @@ Nothing auto-updates. Existing checkouts and local configs are never overwritten
 | Tool | Source | Command | Docs |
 |---|---|---|---|
 | vimax | HKUDS/ViMax | `vimax` | [tools/vimax/README.md](tools/vimax/README.md) |
+| rea | morluto/rea (npm `rea-agents`) | `rea` + MCP `rea` | [tools/rea/README.md](tools/rea/README.md) |

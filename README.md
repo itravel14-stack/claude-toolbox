@@ -69,3 +69,4 @@ Nothing auto-updates. Existing checkouts and local configs are never overwritten
 |---|---|---|---|
 | vimax | HKUDS/ViMax | `vimax` | [tools/vimax/README.md](tools/vimax/README.md) |
 | rea | morluto/rea (npm `rea-agents`) | `rea` + MCP `rea` | [tools/rea/README.md](tools/rea/README.md) |
+| karpathy-guidelines | multica-ai/andrej-karpathy-skills | skill `karpathy-guidelines` | [upstream](https://github.com/multica-ai/andrej-karpathy-skills) |

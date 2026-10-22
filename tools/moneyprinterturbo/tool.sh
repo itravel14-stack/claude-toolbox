@@ -10,6 +10,12 @@ install() {
   # config.toml holds API keys: never committed (upstream .gitignore), never overwritten.
   [[ -f config.toml ]] || { cp config.example.toml config.toml; chmod 600 config.toml; echo "  config: created config.toml"; }
   git check-ignore -q config.toml || { echo "  config.toml is NOT git-ignored"; return 1; }
+  # Cloud sessions re-terminate TLS at a proxy whose CA is in SSL_CERT_FILE; edge_tts
+  # (free voice) hard-codes certifi.where() and rejects it. Startup hook in the venv
+  # points certifi at SSL_CERT_FILE when set; no-op elsewhere. uv sync leaves it alone.
+  local sp; sp="$(uv run --no-sync python -c "import sysconfig; print(sysconfig.get_paths()['purelib'])" 2>/dev/null)"
+  cp "$TOOL_DIR/claude_toolbox_ca.py" "$sp/"
+  echo "import claude_toolbox_ca" > "$sp/zz_claude_toolbox_ca.pth"
   # Official skill + helper, copied from the pinned checkout. Upstream lists only
   # macOS/Windows; the toolbox note records that this Linux install is verified.
   local dst="$HOME/.claude/skills/moneyprinterturbo-video"

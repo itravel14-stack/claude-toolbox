@@ -8,6 +8,12 @@ registered with REA's own setup (`rea setup --client claude_code`):
 | CLI `rea` | npm global prefix (`npm config get prefix`) | the machine/container |
 | MCP server `rea` | `mcpServers.rea` in `~/.claude.json` (user scope) | every project Claude Code opens |
 | Skill `reverse-engineer-anything` | `~/.claude/skills/` | every project Claude Code opens |
+| Ghidra 12.1.4 (decompiler) | `~/tools/ghidra_12.1.4_PUBLIC`, recorded as `GHIDRA_INSTALL_DIR` in the `rea` registration | machine/container |
+
+Ghidra comes from the official release zip, checked against the SHA-256 published in its
+release notes (`tools/rea/ghidra.env`). It is skipped when there is no JDK 21+ `javac`
+(the cloud image has one) or when `REA_GHIDRA=0`. To update: put the new release's URL and
+SHA-256 in `ghidra.env`, run `bash bootstrap.sh rea`, bump `toolbox-rev`.
 
 No repo gets REA files. First setup backs up `~/.claude.json` to `~/.claude.json.rea.backup`
 and preserves every other MCP server; reruns are no-ops.
@@ -21,6 +27,7 @@ ordinary source-repo questions.
 - "Use REA to analyze `./dist/app.asar`: entrypoints, preload bridges, IPC channels, with evidence."
 - "Reverse engineer how feature X works in this Electron app I own; separate verified findings from guesses."
 - "Compare v1.2 and v1.3 of this bundle with REA and list behavioral changes."
+- "Use REA with Ghidra to decompile `./bin/tool` and explain how its license check works."
 - "Map this app's modules and dependencies with REA, then implement a similar feature here without copying code."
 
 Direct CLI: `rea analyze-javascript-application <dir|app.asar> --format json > evidence.json`
@@ -30,7 +37,7 @@ Direct CLI: `rea analyze-javascript-application <dir|app.asar> --format json > e
 | Capability | Cloud container (Linux) | Needs |
 |---|---|---|
 | JS / Electron static analysis, artifact graph | yes (verified) | procps `ps` (present) |
-| Native binaries via Ghidra | no | Ghidra 12.1.x + JDK 21, `GHIDRA_INSTALL_DIR` |
+| Native binaries via Ghidra (ELF, PE/.exe/.dll, Mach-O, raw) | yes (verified: decompiled a test binary) | installed by the toolbox; JDK 21+ |
 | Android via JADX | no | `REA_JADX_MCP_JAR` (jadx-headless-mcp 0.7.1) |
 | IDA | no | paid IDA license + `REA_IDA_MCP_CONFIG` |
 | Hopper / native-macos | no | macOS only |
@@ -42,7 +49,7 @@ Only analyze software you own or are authorized to inspect.
 ```bash
 rea --version                                   # installed version
 rea doctor --client claude_code --skill --json  # registration + skill health (read-only)
-rea doctor --provider ghidra --json             # one analysis engine
+GHIDRA_INSTALL_DIR=~/tools/ghidra_12.1.4_PUBLIC rea doctor --provider ghidra --json   # engine
 claude mcp list | grep rea                      # Claude Code sees it
 ```
 

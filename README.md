@@ -75,3 +75,6 @@ Nothing auto-updates. Existing checkouts and local configs are never overwritten
 | rea | morluto/rea (npm `rea-agents`) | `rea` + MCP `rea` | [tools/rea/README.md](tools/rea/README.md) |
 | karpathy-guidelines | multica-ai/andrej-karpathy-skills | skill `karpathy-guidelines` | [upstream](https://github.com/multica-ai/andrej-karpathy-skills) |
 | moneyprinterturbo | harry0703/MoneyPrinterTurbo | skill `moneyprinterturbo-video` | [tools/moneyprinterturbo/README.md](tools/moneyprinterturbo/README.md) |
+
+## free-scrape
+Free Firecrawl replacement: `free-scrape <url> [--scroll N] [--links] [--json]`. Renders pages in local headless Chromium (Playwright). Installs a `free-scrape` command and a skill that tells Claude to use it instead of Firecrawl in every project. On a PC, Playwright needs `npm install -g playwright && npx playwright install chromium` once.

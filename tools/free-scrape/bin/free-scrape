@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# claude-toolbox: free-scrape wrapper. Renders a URL in local headless Chromium and prints text + links.
+src="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+js="$(dirname "$src")/../scrape.js"
+[[ -f "$js" ]] || js="${TOOLBOX_HOME:-$HOME/tools/claude-toolbox}/tools/free-scrape/scrape.js"
+# Global Playwright installs live outside node's default search path on some machines.
+export NODE_PATH="${NODE_PATH:-}:$(npm root -g 2>/dev/null)"
+exec node "$js" "$@"

@@ -45,8 +45,23 @@ bash ~/tools/claude-toolbox/pc/sync-to-github.sh            # scans C:/Dev/* and
 bash ~/tools/claude-toolbox/pc/sync-to-github.sh "C:/path/a" "C:/path/b"   # or specific folders
 ```
 Pushes every branch, and snapshots uncommitted work to a `cloud-sync/<branch>` branch
-without touching your local files. Skips snapshots containing `.env`/key/secret files.
+without touching your local files. Skips snapshots containing `.env`/key/secret files, key-like content, or files >95 MB.
 Prints folders that aren't on GitHub yet — give Claude that list to create the repos.
+
+## Protect every project (GitHub + encrypted secondary backup)
+
+Full design and recovery runbook: [docs/BACKUP-ARCHITECTURE.md](docs/BACKUP-ARCHITECTURE.md).
+Media/large files: [docs/MEDIA-POLICY.md](docs/MEDIA-POLICY.md). On the PC (Git Bash, after `gh auth login`):
+
+```bash
+bash ~/tools/claude-toolbox/pc/repo-audit.sh                         # read-only inventory -> ~/dev-hq/INVENTORY.md
+bash ~/tools/claude-toolbox/pc/backup-all.sh --openmontage --verify-restore   # encrypted bundles of every repo
+bash ~/tools/claude-toolbox/pc/install-schedule.sh                   # daily sync + health, weekly backup
+bash ~/tools/claude-toolbox/pc/health-check.sh                       # what needs attention -> ~/dev-hq/HEALTH.md
+bash ~/tools/claude-toolbox/pc/restore.sh github-all C:/Dev          # new computer: restore everything
+```
+Cloud watchdog (runs when the PC is off): copy [github-actions/repo-health.yml](github-actions/repo-health.yml)
+into a **private** repo's `.github/workflows/` and add the `AUDIT_TOKEN` secret (instructions in the file).
 
 ## Add a tool
 
@@ -75,6 +90,7 @@ Nothing auto-updates. Existing checkouts and local configs are never overwritten
 | rea | morluto/rea (npm `rea-agents`) | `rea` + MCP `rea` | [tools/rea/README.md](tools/rea/README.md) |
 | karpathy-guidelines | multica-ai/andrej-karpathy-skills | skill `karpathy-guidelines` | [upstream](https://github.com/multica-ai/andrej-karpathy-skills) |
 | moneyprinterturbo | harry0703/MoneyPrinterTurbo | skill `moneyprinterturbo-video` | [tools/moneyprinterturbo/README.md](tools/moneyprinterturbo/README.md) |
+| openmontage | calesthio/OpenMontage | `openmontage` + skill `openmontage` | [tools/openmontage/README.md](tools/openmontage/README.md) |
 
 ## free-scrape
 Free Firecrawl replacement: `free-scrape <url> [--scroll N] [--links] [--json]`. Renders pages in local headless Chromium (Playwright). Installs a `free-scrape` command and a skill that tells Claude to use it instead of Firecrawl in every project. On a PC, Playwright needs `npm install -g playwright && npx playwright install chromium` once.

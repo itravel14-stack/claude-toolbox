@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# claude-toolbox wrapper for the central OpenMontage install (~/tools/openmontage).
+# Usage: openmontage <command> [args]   — run from ANY directory.
+#   claude [prompt]     open Claude Code inside OpenMontage (reads its CLAUDE.md/AGENT_GUIDE.md)
+#   backlot [id]        open the Backlot board (library, or one production)
+#   serve [port]        run Backlot in the foreground (default 4750)
+#   preflight           list available tools/providers (what your API keys unlock)
+#   pipelines           list pipeline definitions
+#   projects            list productions on disk
+#   demo [name]         render a zero-key Remotion demo (no API keys)
+#   test                run the official test suite
+#   export <id> [dir]   copy a production's final renders into dir (default ./media/openmontage)
+#   py <args>           run the OpenMontage venv python inside the install
+#   path                print the install path
+set -euo pipefail
+OM="${OPENMONTAGE_HOME:-$HOME/tools/openmontage}"
+[[ -d "$OM" ]] || { echo "OpenMontage not installed at $OM — run: bash ~/tools/claude-toolbox/bootstrap.sh openmontage" >&2; exit 1; }
+PY="$OM/.venv/bin/python"; [[ -x "$PY" ]] || PY="$OM/.venv/Scripts/python.exe"
+CALLER="$PWD"
+PROJECTS="${OPENMONTAGE_PROJECTS_DIR:-$OM/projects}"
+cmd="${1:-help}"; shift || true
+cd "$OM"
+case "$cmd" in
+  claude)    exec claude "$@" ;;
+  backlot)   exec "$PY" -m backlot open "$@" ;;
+  serve)     exec "$PY" -m backlot serve --port "${1:-4750}" ;;
+  preflight) exec make --no-print-directory preflight ;;
+  pipelines) ls pipeline_defs | sed 's/\.yaml$//' ;;
+  projects)  ls -1t "$PROJECTS" 2>/dev/null || echo "(no productions yet in $PROJECTS)" ;;
+  demo)      if [[ $# -gt 0 ]]; then exec "$PY" render_demo.py "$@"; else exec "$PY" render_demo.py --list; fi ;;
+  test)      exec "$PY" -m pytest tests/ -q "$@" ;;
+  export)
+    id="${1:?usage: openmontage export <project-id> [dest]}"; dest="${2:-$CALLER/media/openmontage}"
+    [[ "$dest" = /* ]] || dest="$CALLER/$dest"
+    src="$PROJECTS/$id"; [[ -d "$src" ]] || { echo "no production $id in $PROJECTS" >&2; exit 1; }
+    mkdir -p "$dest/$id"
+    shopt -s nullglob; files=("$src"/renders/*.mp4 "$src"/*.mp4)
+    [[ ${#files[@]} -gt 0 ]] || { echo "no renders in $src" >&2; exit 1; }
+    cp -v "${files[@]}" "$dest/$id/"
+    echo "exported to $dest/$id — files >50MB belong in Git LFS or external storage (see claude-toolbox/docs/MEDIA-POLICY.md)" ;;
+  py)        exec "$PY" "$@" ;;
+  path)      echo "$OM" ;;
+  *)         sed -n '3,16p' "$0" ;;
+esac

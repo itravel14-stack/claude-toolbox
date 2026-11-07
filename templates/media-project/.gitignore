@@ -1,0 +1,29 @@
+# --- secrets: never committed (keep originals in a password manager) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+credentials*.json
+service-account*.json
+
+# --- dependencies / caches: regenerable ---
+node_modules/
+.venv/
+venv/
+__pycache__/
+.cache/
+.next/
+dist/
+build/
+
+# --- media working files: local or external storage only ---
+# raw footage lives in external storage (see claude-toolbox/docs/MEDIA-POLICY.md)
+raw/
+renders/tmp/
+*.tmp
+*.part
+proxy/
+.DS_Store
+Thumbs.db

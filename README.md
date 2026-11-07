@@ -78,3 +78,8 @@ Nothing auto-updates. Existing checkouts and local configs are never overwritten
 
 ## free-scrape
 Free Firecrawl replacement: `free-scrape <url> [--scroll N] [--links] [--json]`. Renders pages in local headless Chromium (Playwright). Installs a `free-scrape` command and a skill that tells Claude to use it instead of Firecrawl in every project. On a PC, Playwright needs `npm install -g playwright && npx playwright install chromium` once.
+
+## On your PC (local Claude Code sessions)
+Run once in Git Bash (re-run any time to update):
+`curl -fsSL https://raw.githubusercontent.com/itravel14-stack/claude-toolbox/main/pc/install-on-pc.sh | bash`
+It installs free-scrape and writes the always-loaded notes to `~/.claude/CLAUDE.md`, which every local Claude Code session reads.
